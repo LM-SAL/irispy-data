@@ -27,4 +27,5 @@ Notes:
 - `chianti_dbase_o4.h5` is a fiasco HDF5 database with only the O IV ion files (plus all non-ion files), built with `build_chianti_subset.py` from CHIANTI 11.0.2.
   Rebuild it when CHIANTI or fiasco change the database format.
 - `iris_l2_*_cutout_raster.tar.gz` are cut-down copies of IRIS Level 2 raster tarballs from the archive, keeping only the scans and spectral windows the gallery examples read.
+  `iris_l2_*_cutout_SDO.tar.gz` keeps every AIA channel of an SDO tarball but only its first five minutes.
   `make_cutouts.py` lists the source observation, windows and scans of each, and rebuilds them: `python make_cutouts.py <output directory>`.

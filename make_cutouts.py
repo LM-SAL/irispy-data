@@ -1,10 +1,13 @@
 """
-Build the cut-down IRIS Level 2 raster tarballs used by the irispy gallery.
+Build the cut-down IRIS Level 2 tarballs used by the irispy gallery.
 
 Each cutout keeps only the raster scans and spectral windows its examples read. The kept
 FITS extensions are copied byte for byte; the primary header only loses the keywords of the
 dropped windows, and the remaining per-window keywords (``TDESC1``, ``TWAVE1``, ...) are
 renumbered to match the new extension order. The auxiliary and text extensions stay last.
+
+The SDO cutout keeps every AIA channel but only the frames in the first minutes of each,
+cutting the cube, the auxiliary rows and the text-table rows to match.
 
 Usage: python make_cutouts.py <output directory>
 """
@@ -72,6 +75,9 @@ CUTOUTS = {
     ),
 }
 
+# how_to/05: observation, SHA-256 of the archive SDO tarball, minutes of each AIA channel to keep
+SDO_CUTOUT = ("20250519_165924_3640107442", "b77d693fa328a96aec78b4a4aa420d5b167f8f670719fce815836627ed567f42", 5)
+
 
 def cut_primary_header(header, keep):
     """
@@ -116,11 +122,13 @@ def cut_raster_fits(raw, windows):
     return out.getvalue()
 
 
-def make_cutout(observation, known_hash, windows, scans, out_dir):
+def archive_url(observation, kind):
     date = observation[:8]
-    name = f"iris_l2_{observation}_raster.tar.gz"
-    url = f"{ARCHIVE}/{date[:4]}/{date[4:6]}/{date[6:]}/{observation}/{name}"
-    source = pooch.retrieve(url, known_hash=known_hash)
+    return f"{ARCHIVE}/{date[:4]}/{date[4:6]}/{date[6:]}/{observation}/iris_l2_{observation}_{kind}.tar.gz"
+
+
+def make_cutout(observation, known_hash, windows, scans, out_dir):
+    source = pooch.retrieve(archive_url(observation, "raster"), known_hash=known_hash)
     target = Path(out_dir) / f"iris_l2_{observation}_cutout_raster.tar.gz"
     with tarfile.open(source) as tar_in, tarfile.open(target, "w:gz") as tar_out:
         members = sorted((member for member in tar_in.getmembers() if member.isfile()), key=lambda m: m.name)
@@ -132,8 +140,40 @@ def make_cutout(observation, known_hash, windows, scans, out_dir):
     print(f"{target.name}: {target.stat().st_size / 1e6:.1f} MB")
 
 
+def cut_aia_frames(raw, minutes):
+    """
+    Keep the frames of one AIA cube within ``minutes`` of its first frame.
+    """
+    with fits.open(io.BytesIO(raw), do_not_scale_image_data=True) as hdul:
+        times = hdul[1].data[:, hdul[1].header["TIME"]]
+        n = int((times < times[0] + minutes * 60).sum())
+        out = io.BytesIO()
+        fits.HDUList([fits.PrimaryHDU(hdul[0].data[:n], hdul[0].header), fits.ImageHDU(hdul[1].data[:n], hdul[1].header)]).writeto(out)
+        # astropy cannot parse this text table (its TFORMs are 'A0'), so cut its fixed-width rows as bytes.
+        table = hdul.fileinfo(2)
+        header = hdul[2].header.copy()
+        header["NAXIS2"] = n
+        rows = raw[table["datLoc"] : table["datLoc"] + n * header["NAXIS1"]]
+    out.write(header.tostring().encode())
+    out.write(rows + b" " * (-len(rows) % 2880))
+    return out.getvalue(), n
+
+
+def make_sdo_cutout(observation, known_hash, minutes, out_dir):
+    source = pooch.retrieve(archive_url(observation, "SDO"), known_hash=known_hash)
+    target = Path(out_dir) / f"iris_l2_{observation}_cutout_SDO.tar.gz"
+    with tarfile.open(source) as tar_in, tarfile.open(target, "w:gz") as tar_out:
+        for member in sorted((member for member in tar_in.getmembers() if member.isfile()), key=lambda m: m.name):
+            data, n = cut_aia_frames(tar_in.extractfile(member).read(), minutes)
+            member.size = len(data)
+            tar_out.addfile(member, io.BytesIO(data))
+            print(f"  {member.name}: {n} frames")
+    print(f"{target.name}: {target.stat().st_size / 1e6:.1f} MB")
+
+
 if __name__ == "__main__":
     out_dir = Path(sys.argv[1])
     out_dir.mkdir(parents=True, exist_ok=True)
     for observation, (known_hash, windows, scans) in CUTOUTS.items():
         make_cutout(observation, known_hash, windows, scans, out_dir)
+    make_sdo_cutout(*SDO_CUTOUT, out_dir)
