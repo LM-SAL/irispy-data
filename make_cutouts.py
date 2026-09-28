@@ -163,7 +163,8 @@ def make_sdo_cutout(observation, known_hash, minutes, out_dir):
     source = pooch.retrieve(archive_url(observation, "SDO"), known_hash=known_hash)
     target = Path(out_dir) / f"iris_l2_{observation}_cutout_SDO.tar.gz"
     with tarfile.open(source) as tar_in, tarfile.open(target, "w:gz") as tar_out:
-        for member in sorted((member for member in tar_in.getmembers() if member.isfile()), key=lambda m: m.name):
+        # Keep the archive's member order, which is the order read_files returns the channels in.
+        for member in (member for member in tar_in.getmembers() if member.isfile()):
             data, n = cut_aia_frames(tar_in.extractfile(member).read(), minutes)
             member.size = len(data)
             tar_out.addfile(member, io.BytesIO(data))
