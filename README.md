@@ -29,3 +29,7 @@ Notes:
 - `iris_l2_*_cutout_raster.tar.gz` are cut-down copies of IRIS Level 2 raster tarballs from the archive, keeping only the scans and spectral windows the gallery examples read.
   `iris_l2_*_cutout_SDO.tar.gz` keeps every AIA channel of an SDO tarball but only its first five minutes.
   `make_cutouts.py` lists the source observation, windows and scans of each, and rebuilds them: `python make_cutouts.py <output directory>`.
+- `iris_l2_20200402_224709_3610108077_cutout_2796_raster.fits.gz` (analysis/10) is raster 0 of
+  `iris_l2_20200402_224709_3610108077_raster.tar.gz`, cut to the field of Figure 3 of Long et al. (2024) and to the Mg II h and k lines
+  with irispy's `irispy/data/test/cut.py`, which keeps the raw values:
+  `python cut.py iris_l2_20200402_224709_3610108077_raster_t000_r00000.fits iris_l2_20200402_224709_3610108077_cutout_2796_raster.fits --rows 127:458 --window "Mg II k 2796" 100:268`, then `gzip -9`.
