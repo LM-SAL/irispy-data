@@ -1,35 +1,18 @@
 # irispy-data
 
-Sample and test data files for the [`irispy`](https://github.com/LM-SAL/irispy) documentation gallery and remote-data tests.
+Sample and test data for [irispy](https://github.com/LM-SAL/irispy), stored as
+release assets. Keep data files out of git.
 
-The files are **not** stored in the git tree — they are attached as release assets and downloaded on demand with [pooch](https://www.fatiando.org/pooch/), which checks their SHA-256 and caches them locally.
+## Adding or updating data
 
-Download URL pattern:
-
-```
-https://github.com/LM-SAL/irispy-data/releases/download/<tag>/<filename>
-```
-
-## Adding or updating files
-
-Use `upload_data.sh` (requires the [`gh` CLI](https://cli.github.com/), authenticated):
+With an authenticated [GitHub CLI](https://cli.github.com/), run:
 
 ```bash
-./upload_data.sh path/to/file1.fits.gz path/to/file2.tar.gz
+./upload_data.sh file1.fits.gz file2.tar.gz
 ```
 
-Always upload to the `v1` tag (the default) and let it clobber same-named assets, one release holds the current copy of everything.
-The script prints the URL + SHA-256 to use as `pooch.retrieve(url, known_hash=...)` in irispy; a changed file changes its hash, so update irispy in the same PR.
+The script creates the `v1` release if needed, replaces assets with matching
+names, and prints their download URLs and SHA-256 hashes.
 
-Notes:
-
-- Per-file limit is 2 GB (GitHub release asset limit).
-- `chianti_dbase_o4.h5` is a fiasco HDF5 database with only the O IV ion files (plus all non-ion files), built with `build_chianti_subset.py` from CHIANTI 11.0.2.
-  Rebuild it when CHIANTI or fiasco change the database format.
-- `iris_l2_*_cutout_raster.tar.gz` are cut-down copies of IRIS Level 2 raster tarballs from the archive, keeping only the scans and spectral windows the gallery examples read.
-  `iris_l2_*_cutout_SDO.tar.gz` keeps every AIA channel of an SDO tarball but only its first five minutes.
-  `make_cutouts.py` lists the source observation, windows and scans of each, and rebuilds them: `python make_cutouts.py <output directory>`.
-- `iris_l2_20200402_224709_3610108077_cutout_2796_raster.fits.gz` (analysis/10) is raster 0 of
-  `iris_l2_20200402_224709_3610108077_raster.tar.gz`, cut to the field of Figure 3 of Long et al. (2024) and to the Mg II h and k lines
-  with irispy's `irispy/data/test/cut.py`, which keeps the raw values:
-  `python cut.py iris_l2_20200402_224709_3610108077_raster_t000_r00000.fits iris_l2_20200402_224709_3610108077_cutout_2796_raster.fits --rows 127:458 --window "Mg II k 2796" 100:268`, then `gzip -9`.
+Update the URLs and SHA-256 hashes in irispy’s `pooch.retrieve` calls when
+adding or changing a file.
